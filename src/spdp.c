@@ -35,21 +35,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Authors: Martin Burtscher and Steven Claggett
 */
 
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "spdp.h"
+
 #define BUFFER_SIZE (1 << 23)
 #define MAX_TABLE_SIZE (1 << 18)
 
-typedef unsigned char byte_t;
 typedef unsigned int word_t;
 
 static byte_t buffer1[BUFFER_SIZE];
 static byte_t buffer2[BUFFER_SIZE * 2 + 9];
 
-static size_t compress(const byte_t level, const size_t length, byte_t* const buf1, byte_t* const buf2)
+size_t
+spdp_compress(const byte_t level, const size_t length, byte_t* const buf1, byte_t* const buf2)
 {
   word_t* in = (word_t*)buf1;
   word_t* out = (word_t*)buf2;
@@ -122,7 +123,8 @@ static size_t compress(const byte_t level, const size_t length, byte_t* const bu
   return wpos;
 }
 
-static void decompress(const byte_t level, const size_t length, byte_t* const buf2, byte_t* const buf1)
+size_t
+spdp_decompress(const byte_t level, const size_t length, byte_t* const buf2, byte_t* const buf1)
 {
   unsigned int predtabsize = 1 << (level + 9);
   if (predtabsize > MAX_TABLE_SIZE) predtabsize = MAX_TABLE_SIZE;
@@ -188,50 +190,6 @@ static void decompress(const byte_t level, const size_t length, byte_t* const bu
   for (pos = len * sizeof(word_t); pos < usize; pos++) {
     buf1[pos] = buf2[pos];
   }
-}
 
-int main(int argc, char *argv[])
-{
-  fprintf(stderr, "SPDP Floating-Point Compressor v1.0\n");
-  fprintf(stderr, "Copyright (c) 2016 Texas State University\n\n");
-
-  if ((argc != 1) && (argc != 2)) {
-    fprintf(stderr, "compression usage: %s level < uncompressed_file > compressed_file\n", argv[0]);
-    fprintf(stderr, "decompression usage: %s < compressed_file > decompressed_file\n", argv[0]);
-    return -1;
-  }
-
-  if (argc == 2) {  // compression
-    byte_t level = atoi(argv[1]);
-    if (level < 0) level = 0;
-    if (level > 9) level = 9;
-    fwrite(&level, sizeof(byte_t), 1, stdout);
-
-    int length = fread(buffer1, sizeof(byte_t), BUFFER_SIZE, stdin);
-    while (length > 0) {
-      fwrite(&length, sizeof(int), 1, stdout);
-      int csize = compress(level, length, buffer1, buffer2);
-      fwrite(&csize, sizeof(int), 1, stdout);
-      fwrite(buffer2, sizeof(byte_t), csize, stdout);
-      length = fread(buffer1, sizeof(byte_t), BUFFER_SIZE, stdin);
-    }
-  } else {  // decompression
-    byte_t level = 10;
-    fread(&level, sizeof(byte_t), 1, stdin);
-    if ((level < 0) || (level > 9)) {
-      fprintf(stderr, "incorrect input file type\n");
-      return -2;
-    }
-
-    int length;
-    while (fread(&length, sizeof(int), 1, stdin) > 0) {
-      int csize;
-      fread(&csize, sizeof(int), 1, stdin);
-      fread(buffer2, sizeof(byte_t), csize, stdin);
-      decompress(level, csize, buffer2, buffer1);
-      fwrite(buffer1, sizeof(byte_t), length, stdout);
-    }
-  }
-
-  return 0;
+  return pos;
 }
